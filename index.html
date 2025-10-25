@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân Loại Teachable Machine</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    <style>
+        /* Tối ưu hóa giao diện cho mọi thiết bị */
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        #webcam-container {
+            margin-top: 20px;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            overflow: hidden;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+        #label-container div {
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #e0f2fe;
+            border-radius: 6px;
+            font-weight: bold;
+            color: #1e40af;
+            font-size: 1.1em;
+            text-align: left;
+        }
+        .loading-text {
+            color: #6b7280;
+            margin: 15px 0;
+        }
+        button {
+            background-color: #2563eb;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 15px;
+        }
+        button:hover {
+            background-color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Máy Phân Loại Ảnh</h1>
+        <p class="loading-text" id="loading-status">Đang tải mô hình...</p>
+        
+        <!-- Khu vực hiển thị camera và nhãn -->
+        <div id="webcam-container"></div>
+        <div id="label-container"></div>
+
+        <button onclick="init()">Bắt Đầu Camera</button>
+    </div>
+
+    <script type="text/javascript">
+        // ĐƯỜNG DẪN MÔ HÌNH CỦA BẠN (ĐÃ ĐƯỢC CẬP NHẬT)
+        // Đây là liên kết mô hình mới mà bạn đã cung cấp: https://teachablemachine.withgoogle.com/models/pnPMxzkfF/
+        const URL = "https://teachablemachine.withgoogle.com/models/pnPMxzkfF/"; 
+        
+        let model, webcam, labelContainer, maxPredictions;
+        const loadingStatus = document.getElementById('loading-status');
+
+        // Hàm được gọi khi nhấn nút "Bắt Đầu Camera"
+        async function init() {
+            try {
+                loadingStatus.textContent = 'Đang tải mô hình... (Có thể mất vài giây)';
+                
+                const modelURL = URL + "model.json";
+                const metadataURL = URL + "metadata.json";
+
+                // Tải mô hình và siêu dữ liệu
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                // Cài đặt webcam
+                const flip = true; // lật hình ảnh cho người dùng
+                webcam = new tmImage.Webcam(200, 200, flip); 
+                await webcam.setup(); // yêu cầu quyền truy cập camera
+                await webcam.play();
+                window.requestAnimationFrame(loop);
+
+                // Thêm camera và nhãn vào giao diện
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                labelContainer = document.getElementById("label-container");
+                labelContainer.innerHTML = '';
+                for (let i = 0; i < maxPredictions; i++) {
+                    labelContainer.appendChild(document.createElement("div"));
+                }
+                loadingStatus.textContent = 'Camera đã sẵn sàng. Hãy đưa đối tượng vào khung hình.';
+
+            } catch (error) {
+                loadingStatus.textContent = 'Lỗi: Không thể tải mô hình hoặc camera. Vui lòng kiểm tra lại URL mô hình và cho phép truy cập camera.';
+                console.error("Initialization error:", error);
+            }
+        }
+
+        // Vòng lặp chính để liên tục dự đoán
+        async function loop() {
+            webcam.update(); // cập nhật khung hình từ webcam
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        // Hàm dự đoán kết quả
+        async function predict() {
+            // dự đoán khung hình hiện tại từ webcam
+            const prediction = await model.predict(webcam.canvas);
+            
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction =
+                    // Lấy tên nhãn và độ tin cậy
+                    prediction[i].className + ": " + prediction[i].probability.toFixed(2) * 100 + "%";
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+                
+                // (Tùy chọn) Tô màu nhãn có độ tin cậy cao nhất
+                if (prediction[i].probability > 0.8) {
+                    labelContainer.childNodes[i].style.backgroundColor = '#dbeafe';
+                } else {
+                    labelContainer.childNodes[i].style.backgroundColor = '#e0f2fe';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
